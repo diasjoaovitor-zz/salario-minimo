@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Salário Mínimo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      border: none;
+      outline: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      margin:  0 auto;
+      padding: 0 20px;
+    }
+
+    body {
+      background-image: linear-gradient(to right, rgba(109, 109, 189, 1), rgb(109, 109, 189, .3));
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    main div {
+      background-image: linear-gradient(rgba(209, 209, 240, 1), rgba(209, 209, 240, .3));
+      padding: 40px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #fff;
+      margin-bottom: 40px;
+    }
+
+    select {
+      height: 40px;
+      padding: 0 10px;
+      border-radius: 4px;
+      background-color: #fff;
+    }
+
+    output {
+      display: block;
+      margin-top: 40px;
+      font-size: 36px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .loader-container {
+      position: fixed;
+      height: 100vh;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-image: linear-gradient(to right, rgba(109, 109, 189, 1), rgb(109, 109, 189, .3));
+    }
+
+    footer {
+      color: #fff;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+
+    footer a {
+      color: #fff;
+    }
+
+    .loader {
+      border: 16px solid #f3f3f3; 
+      border-top: 16px solid #6d6dbd; 
+      border-radius: 50%;
+      width: 120px;
+      height: 120px;
+      animation: spin 1.5s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <div>
+      <h1>Salário mínimo vigente no Brasil</h1>
+      <select id="month">
+        <option value="">mês</option>
+      </select>
+      <select id="year">
+        <option value="">ano</option>
+      </select>
+      <output>R$ 0,00</output>
+    </div>
+  </main>
+
+  <footer>
+    Criado por <a href="https://github.com/diasjoaovitor" target="_blank">João VItor</a>
+  </footer>
+
+  <div class="loader-container">
+    <div class="loader"></div>
+  </div>
+
+  <script>
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+    const loader = document.querySelector('.loader-container')
+
+    async function getYears() {
+      const response = await fetch('https://salariominimo.herokuapp.com')
+      const data = await response.json()
+
+      const years = new Set()
+
+      data.forEach(({ period, salary }) => {
+        const [ year ] = period.split('-')
+
+        years.add(year)
+      })
+
+      return Array.from(years)
+    }
+
+    async function getSalary(period) {
+      const response = await fetch(`https://salariominimo.herokuapp.com/show/${period}`)
+      const { salary } = await response.json()
+
+      return salary
+    }
+
+    async function setSelect() {
+      const d = new Date()
+
+      const year = d.getFullYear()
+      const month = months[d.getMonth()]
+
+      const years = await getYears()
+      const salary = await getSalary(`${year}-${formatMonth(d.getMonth())}`)
+
+      const yearSelect = document.getElementById('year')
+      const monthSelect = document.getElementById('month')
+      const output = document.querySelector("output")
+      
+      yearSelect.innerHTML = ''
+      monthSelect.innerHTML = ''
+
+      years.forEach(year => {
+        const option = document.createElement('option')
+    
+        option.textContent = year
+        yearSelect.appendChild(option)
+      })
+
+      months.forEach(month => {
+        const option = document.createElement('option')
+
+        option.textContent = month
+        monthSelect.appendChild(option)
+      })
+
+      monthSelect.value = month
+      output.textContent = formatSalary(salary)
+
+      loader.style.display = 'none'
+    }
+
+    function formatSalary(salary) {
+      return Intl.NumberFormat('pt-br', {
+        style: 'currency', currency: 'BRL'
+      }).format(salary)
+    }
+
+    function formatMonth(month) {
+      month += 1
+
+      return month < 10 ? `0${month}` : month
+    }
+
+    window.onload = setSelect()
+    
+    document.addEventListener('change', async e => {
+      const output = document.querySelector('output')
+
+      if(e.target.id === 'month') {
+        loader.style.display = 'flex'
+
+        const year = document.getElementById('year')
+        const month = months.indexOf(e.target.value)
+        
+        try {
+          const salary = await getSalary(`${year.value}-${formatMonth(month)}`)
+
+          output.textContent = formatSalary(salary)
+          output.style.fontSize = '36px'
+        } catch (error) {
+          output.textContent = 'Não foram econtrados dados neste periodo'
+          output.style.fontSize = '24px'
+        }
+
+        loader.style.display = 'none'
+
+        return
+      }
+
+      if(e.target.id === 'year') {
+        loader.style.display = 'flex'
+
+        const month = months.indexOf(document.getElementById('month').value)
+
+        try {
+          const salary = await getSalary(`${e.target.value}-${formatMonth(month)}`)
+
+          output.textContent = formatSalary(salary)
+          output.style.fontSize = '36px'
+        } catch (error) {
+          output.textContent = 'Não foram econtrados dados neste periodo'
+          output.style.fontSize = '24px'
+        }
+
+        loader.style.display = 'none'
+      }
+    })
+  </script>
+</body>
+</html>
